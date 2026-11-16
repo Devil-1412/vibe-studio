@@ -1,0 +1,241 @@
+{
+  "name": "vibe-studio",
+  "displayName": "Vibe Studio",
+  "description": "Vibe code with several AI agents at once: your Claude Code and Codex chats side by side, each with its own message box, plus cats, a shelf and a magic wand.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onWebviewPanel:vibeStudio"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "vibeStudio.open",
+        "title": "Open Vibe Studio",
+        "category": "Vibe Studio",
+        "icon": "$(layout)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "vibeStudio.open",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d"
+      }
+    ],
+    "configuration": {
+      "title": "Vibe Studio",
+      "properties": {
+        "vibeStudio.claudePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the claude binary. Empty = use the one bundled with the Claude Code extension, then PATH."
+        },
+        "vibeStudio.codexPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the codex binary. Empty = use the one bundled with the Codex extension, then PATH."
+        },
+        "vibeStudio.claudeMode": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "acceptEdits",
+            "auto",
+            "plan",
+            "manual",
+            "bypassPermissions"
+          ],
+          "description": "Default permission mode for messages sent to Claude sessions."
+        },
+        "vibeStudio.claudeModel": {
+          "type": "string",
+          "default": "claude-opus-5-5",
+          "description": "Default model for Claude tiles. Empty = the CLI's own default."
+        },
+        "vibeStudio.claudeEffort": {
+          "type": "string",
+          "default": "xhigh",
+          "enum": [
+            "",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "description": "Default reasoning effort for Claude tiles. Empty = the CLI's own default."
+        },
+        "vibeStudio.claudeChrome": {
+          "type": "boolean",
+          "default": true,
+          "description": "Turn on Claude in Chrome for Claude tiles by default."
+        },
+        "vibeStudio.codexMode": {
+          "type": "string",
+          "default": "workspace-write",
+          "enum": [
+            "read-only",
+            "workspace-write",
+            "danger-full-access"
+          ],
+          "description": "Default sandbox for messages sent to Codex sessions."
+        },
+        "vibeStudio.claudeModels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra Claude model ids to offer in the model picker, e.g. \"claude-opus-4-1-20250805\". Current models and every model your past sessions used are listed automatically."
+        },
+        "vibeStudio.codexModels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra Codex model ids to offer in the model picker. Models from ~/.codex/models_cache.json and your past sessions are listed automatically."
+        },
+        "vibeStudio.prompts": {
+          "type": "array",
+          "description": "One-click prompt chips above each tile's message box. Click sends (or queues while the agent is busy); Alt/Shift-click puts the text in the box to edit first.",
+          "items": {
+            "type": "object",
+            "required": [
+              "label",
+              "prompt"
+            ],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "prompt": {
+                "type": "string"
+              }
+            }
+          },
+          "default": [
+            {
+              "label": "Review staged",
+              "prompt": "Review the staged changes (git diff --cached) for bugs, regressions and missed edge cases. Do not modify anything."
+            },
+            {
+              "label": "Commit message",
+              "prompt": "Write a git commit message for the staged changes."
+            },
+            {
+              "label": "Typecheck + lint",
+              "prompt": "Run this project's typecheck and lint, then fix any errors your changes introduced."
+            },
+            {
+              "label": "Continue",
+              "prompt": "Continue."
+            }
+          ]
+        },
+        "vibeStudio.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Vibe Studio button in the status bar."
+        },
+        "vibeStudio.showTimestamps": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the time on messages and a date divider between days in each tile."
+        },
+        "vibeStudio.catCommentary": {
+          "type": "boolean",
+          "default": true,
+          "description": "A small speech bubble by each cat or robot saying what its chat is doing (\"Ginger is reading plan-section.tsx\"). No sound."
+        },
+        "vibeStudio.reportInPoints": {
+          "type": "boolean",
+          "default": true,
+          "description": "Tell the agent to report findings as short bullet points, so each point can take your comment. About 40 extra tokens per turn. Applies to chats started after the change."
+        },
+        "vibeStudio.game": {
+          "type": "boolean",
+          "default": true,
+          "description": "Keystroke Coins: an idle game. Typing earns coins, running tiles earn more, and coins buy upgrades. Shown as a counter in the top bar."
+        },
+        "vibeStudio.gameFloaters": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show a small +N next to the message box for each character that earns a coin."
+        },
+        "vibeStudio.focusView": {
+          "type": "boolean",
+          "default": false,
+          "description": "Focus view for tiles that have no choice of their own: fold tool calls and thinking into one row so a chat reads as prompts and replies. Toggle a tile with the eye button or Ctrl+Alt+F."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p webview",
+    "check:parsers": "node esbuild.mjs && node dist/check.js",
+    "test:runner": "esbuild scripts/runner-selftest.ts --bundle --platform=node --outfile=dist/runner-selftest.js --log-level=warning && node dist/runner-selftest.js",
+    "package": "node esbuild.mjs --production && vsce package --no-dependencies --allow-missing-repository --skip-license",
+    "test:mentions": "esbuild scripts/mention-selftest.ts --bundle --platform=node --outfile=dist/mention-selftest.js --log-level=warning && node dist/mention-selftest.js",
+    "test:usage": "esbuild scripts/usage-selftest.ts --bundle --platform=node --outfile=dist/usage-selftest.js --log-level=warning && node dist/usage-selftest.js",
+    "test:servers": "esbuild scripts/servers-selftest.ts --bundle --platform=node --outfile=dist/servers-selftest.js --log-level=warning && node dist/servers-selftest.js",
+    "test:codex": "esbuild scripts/codexusage-selftest.ts --bundle --platform=node --outfile=dist/codexusage-selftest.js --log-level=warning && node dist/codexusage-selftest.js",
+    "test:commentary": "esbuild scripts/commentary-selftest.ts --bundle --platform=node --outfile=dist/commentary-selftest.js --log-level=warning && node dist/commentary-selftest.js",
+    "test:shortcuts": "esbuild scripts/shortcuts-selftest.ts --bundle --platform=node --outfile=dist/shortcuts-selftest.js --log-level=warning && node dist/shortcuts-selftest.js",
+    "test:handoff": "esbuild scripts/handoff-selftest.ts --bundle --platform=node --outfile=dist/handoff-selftest.js --log-level=warning && node dist/handoff-selftest.js",
+    "test:comments": "esbuild scripts/comments-selftest.ts --bundle --platform=node --outfile=dist/comments-selftest.js --log-level=warning && node dist/comments-selftest.js",
+    "test:improve": "esbuild scripts/improve-selftest.ts --bundle --platform=node --outfile=dist/improve-selftest.js --log-level=warning && node dist/improve-selftest.js",
+    "test:shelf": "esbuild scripts/shelf-selftest.ts --bundle --platform=node --outfile=dist/shelf-selftest.js --log-level=warning && node dist/shelf-selftest.js",
+    "test:game": "esbuild scripts/game-selftest.ts --bundle --platform=node --outfile=dist/game-selftest.js --log-level=warning && node dist/game-selftest.js",
+    "test:asks": "esbuild scripts/asks-selftest.ts --bundle --platform=node --outfile=dist/asks-selftest.js --log-level=warning && node dist/asks-selftest.js",
+    "test:parser": "esbuild scripts/parser-selftest.ts --bundle --platform=node --outfile=dist/parser-selftest.js --log-level=warning && node dist/parser-selftest.js",
+    "test:agents": "esbuild scripts/agents-selftest.ts --bundle --platform=node --outfile=dist/agents-selftest.js --log-level=warning && node dist/agents-selftest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.17",
+    "marked": "^18.2.0"
+  },
+  "icon": "media/icon.png",
+  "keywords": [
+    "claude",
+    "claude code",
+    "codex",
+    "ai",
+    "agents",
+    "chat",
+    "multi-agent",
+    "grid"
+  ],
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Devil-1412/vibe-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Devil-1412/vibe-studio/issues"
+  },
+  "homepage": "https://github.com/Devil-1412/vibe-studio#readme"
+}

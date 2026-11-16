@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Agent Deck">
+  <rect x="4" y="4" width="120" height="120" rx="27" fill="#181c2e" stroke="#8290f5" stroke-width="4"/>
+  <path d="M15 25c0-6 4.8-10.8 10.8-10.8h31.4C63.2 14.2 68 19 68 25v22c0 6-4.8 10.8-10.8 10.8H35l-11.2 8.4v-8.8C18.7 56.4 15 52 15 46.8Z" fill="#3d456e"/>
+  <rect x="74" y="14.2" width="39" height="43.6" rx="10.8" fill="#353c61"/>
+  <path d="M15 79.5c0-6 4.8-10.8 10.8-10.8h31.4C63.2 68.7 68 73.5 68 79.5v21.8c0 6-4.8 10.8-10.8 10.8H35l-11.2 8.2v-8.6c-5.1-1-8.8-5.4-8.8-10.6Z" fill="#7889f0"/>
+  <rect x="74" y="68.7" width="39" height="43.4" rx="10.8" fill="#353c61"/>
+  <g stroke="#18203b" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M25.5 31.5c-.8-2.6-.6-5.8.5-8.7.5-1.1 1.4-1.2 2.3-.4l5.1 3.7c3.2-.9 6.4-.9 9.6 0l5.1-3.7c.9-.8 1.8-.7 2.3.4 1.1 2.9 1.3 6.1.5 8.7 1.4 1.6 1.9 4 1.3 6.4-1 4.5-5.9 7.2-14 7.2s-13-2.7-14-7.2c-.6-2.4-.1-4.8 1.3-6.4Z" fill="#efb064" stroke-width="1.8"/>
+    <path d="m26.4 29.5.6-5.2 4.6 3.3c-2.2.5-3.9 1.1-5.2 1.9Zm23.1 0-.6-5.2-4.6 3.3c2.2.5 3.9 1.1 5.2 1.9Z" fill="#ce7541" stroke="none"/>
+    <ellipse cx="32.3" cy="35.6" rx="2.6" ry="3.1" fill="#2f2630" stroke-width="1"/><ellipse cx="44.1" cy="35.6" rx="2.6" ry="3.1" fill="#2f2630" stroke-width="1"/>
+    <circle cx="31.5" cy="34.5" r=".9" fill="#fff" stroke="none"/><circle cx="43.3" cy="34.5" r=".9" fill="#fff" stroke="none"/>
+    <path d="m37.2 39.2 1 .8 1-.8c-.3-.8-1.7-.8-2 0Z" fill="#dc7e8a" stroke-width=".8"/>
+    <path d="M38.2 40c-.1 1-.9 1.5-1.7 1.5m1.7-1.5c.1 1 .9 1.5 1.7 1.5" fill="none" stroke-width="1.1"/>
+  </g>
+  <g stroke="#1b2145" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M93.5 23v-3.5" stroke="#9aa7ff" stroke-width="2"/><circle cx="93.5" cy="18" r="2.5" fill="#ffd25a" stroke-width="1.3"/>
+    <rect x="80.2" y="23" width="26.6" height="25.5" rx="8" fill="#7e8ef2" stroke-width="1.8"/>
+    <rect x="83.5" y="28" width="20" height="14.3" rx="4.4" fill="#171c38" stroke-width="1.2"/>
+    <rect x="86.5" y="31.3" width="4.5" height="5.3" rx="2" fill="#80ffc0" stroke="none"/><rect x="96" y="31.3" width="4.5" height="5.3" rx="2" fill="#80ffc0" stroke="none"/>
+    <circle cx="87.8" cy="32.5" r=".8" fill="#fff" stroke="none"/><circle cx="97.3" cy="32.5" r=".8" fill="#fff" stroke="none"/>
+    <path d="M89.6 38.3c1.7 1.8 6.1 1.8 7.8 0" fill="none" stroke="#80ffc0" stroke-width="1.5"/>
+    <ellipse cx="84.9" cy="38.2" rx="1.5" ry=".8" fill="#ff7f9d" stroke="none"/><ellipse cx="102.1" cy="38.2" rx="1.5" ry=".8" fill="#ff7f9d" stroke="none"/>
+  </g>
+  <path d="M27 83h27M27 93h20M27 103h14" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".94"/>
+  <path d="M94 78.5c.7 6 2.8 8.1 8.8 8.8-6 .7-8.1 2.8-8.8 8.8-.7-6-2.8-8.1-8.8-8.8 6-.7 8.1-2.8 8.8-8.8Z" fill="#90ffc2"/>
+  <path d="M102.8 97.5c.3 2.7 1.3 3.7 4 4-2.7.3-3.7 1.3-4 4-.3-2.7-1.3-3.7-4-4 2.7-.3 3.7-1.3 4-4Z" fill="#ffd25a"/>
+</svg>

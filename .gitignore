@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.vsix
+dev/
+assets-proposed/
+assets-proposed-v2/
+backup-art/
