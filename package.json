@@ -3,7 +3,7 @@
   "displayName": "Vibe Studio",
   "description": "Vibe code with several AI agents at once: your Claude Code and Codex chats side by side, each with its own message box, plus cats, a shelf and a magic wand.",
   "version": "0.1.0",
-  "publisher": "local",
+  "publisher": "VibeCoder1412",
   "license": "MIT",
   "private": true,
   "engines": {
