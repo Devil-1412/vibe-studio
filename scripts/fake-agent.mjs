@@ -23,6 +23,8 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
     console.log(JSON.stringify({ type: 'assistant', pid: process.pid, text: 'answer:' + JSON.stringify(d.response.response) }));
     waiting = undefined;
     console.log(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, pid: process.pid }));
+  } else if (d.type === 'control_request' && d.request.subtype === 'set_permission_mode') {
+    console.log(JSON.stringify({ type: 'assistant', pid: process.pid, text: 'mode:' + d.request.mode }));
   } else if (d.type === 'control_request' && d.request.subtype === 'interrupt' && waiting) {
     console.log(JSON.stringify({ type: 'control_cancel_request', request_id: waiting }));
     waiting = undefined;

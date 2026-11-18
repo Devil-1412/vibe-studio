@@ -11,6 +11,7 @@ import { scanServers } from './servers';
 import { latestCodexUsage } from './codexUsage';
 import { improvePrompt } from './improve';
 import { cleanShelf } from './shelf';
+import { AGENT_DEFAULTS, PANEL_SETTINGS, validSetting } from './settings';
 import { Asks, answerLines, cancelledId, parseAsk } from './asks';
 import { mergeLimitEvent } from './limits';
 import { Runner, type LiveSpec } from './runner';
@@ -52,6 +53,8 @@ interface Persisted {
   layouts: SavedLayout[];
   /** Each chat's cat: name, coat, hat, neckwear. */
   cats: Record<string, CatPrefs>;
+  /** Low usage mode (from the usage popup). */
+  lowUsage: boolean;
   /** Names given in Vibe Studio; they override the agent's own title here only. */
   names: Record<string, string>;
 }
@@ -122,6 +125,7 @@ export class Deck {
       layout: { columns: 2, rows: 2, sidebar: true },
       layouts: [],
       cats: {},
+      lowUsage: false,
       modes: {},
       models: {},
       chrome: {},
@@ -138,6 +142,7 @@ export class Deck {
     this.state.focus ??= {};
     this.state.layouts ??= [];
     this.state.cats ??= {};
+    this.state.lowUsage ??= false;
     panel.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'icon.svg');
     panel.webview.html = this.html();
     panel.webview.onDidReceiveMessage((m: FromWebview) => this.onMessage(m).catch((e) => console.error('[vibe-studio]', e)));
@@ -147,6 +152,8 @@ export class Deck {
       if (e.affectsConfiguration('vibeStudio.game') || e.affectsConfiguration('vibeStudio.gameFloaters')) this.post({ type: 'gameConfig', on: this.gameOn(), floaters: this.gameFloaters() });
       if (e.affectsConfiguration('vibeStudio.catCommentary')) this.post({ type: 'commentary', on: this.commentary() });
       if (e.affectsConfiguration('vibeStudio.focusView')) this.post({ type: 'focusView', on: this.focusView() });
+      if (AGENT_DEFAULTS.some((k) => e.affectsConfiguration(`vibeStudio.${k}`))) void this.agents().then((agents) => this.post({ type: 'agents', agents }));
+      if (e.affectsConfiguration('vibeStudio')) this.post({ type: 'settings', values: this.panelSettings() });
     });
     panel.onDidDispose(() => config.dispose());
     this.timers.push(setInterval(() => void this.pumpAll(), 1000));
@@ -202,6 +209,8 @@ export class Deck {
           commentary: this.commentary(),
           cats: this.state.cats,
           shelf: cleanShelf(this.context.globalState.get(SHELF_KEY)),
+          lowUsage: this.state.lowUsage,
+          settings: this.panelSettings(),
         });
         this.tiles.clear();
         for (const key of this.state.open) void this.attach(key);
@@ -311,13 +320,13 @@ export class Deck {
         return;
       }
       case 'send':
-        this.send(m.key, m.text, { mode: m.mode, model: m.model, effort: m.effort, chrome: m.chrome, points: this.reportInPoints() }, m.attachments);
+        this.send(m.key, m.text, { mode: m.mode, model: m.model, effort: m.effort, chrome: m.chrome, points: this.reportInPoints(), low: this.state.lowUsage }, m.attachments);
         return;
       case 'stop':
         runner.stop(m.key);
         return;
       case 'newChat':
-        this.newChat(m.draftKey, m.agent, m.cwd, m.text, { mode: m.mode, model: m.model, effort: m.effort, chrome: m.chrome, points: this.reportInPoints() }, m.attachments);
+        this.newChat(m.draftKey, m.agent, m.cwd, m.text, { mode: m.mode, model: m.model, effort: m.effort, chrome: m.chrome, points: this.reportInPoints(), low: this.state.lowUsage }, m.attachments, m.pinned);
         return;
       case 'pickFolder': {
         const picked = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: 'Start chat here' });
@@ -348,6 +357,17 @@ export class Deck {
       }
       case 'shelfSave':
         void this.context.globalState.update(SHELF_KEY, cleanShelf(m.items));
+        return;
+      case 'setSetting':
+        // user settings, so the panel and VS Code's settings editor always agree
+        if (validSetting(m.key, m.value)) await vscode.workspace.getConfiguration('vibeStudio').update(m.key, m.value, vscode.ConfigurationTarget.Global);
+        return;
+      case 'openSettings':
+        await vscode.commands.executeCommand('workbench.action.openSettings', `@ext:${this.context.extension.id}`);
+        return;
+      case 'setLowUsage':
+        this.state.lowUsage = !!m.on;
+        this.save();
         return;
       case 'setCat': {
         const cat = cleanCat(m.cat);
@@ -512,7 +532,7 @@ export class Deck {
     const resolve = this.resolveAgent(tile.key);
     // only a running agent needs its transcript looked at to tell working from stopped
     const agents = tile.parser.items.flatMap((i) =>
-      i.kind === 'agent' ? [{ id: i.id, description: i.description, status: agentStatus(i, i.status === 'running' ? resolve(i) : undefined) }] : [],
+      i.kind === 'agent' ? [{ id: i.id, description: i.description, status: agentStatus(i, i.status === 'running' ? resolve(i) : undefined, Date.now(), runner.hasLive(tile.key)) }] : [],
     );
     return { model, effort, usage: { ...usage, window }, files: [...tile.parser.files.values()], skills: [...tile.parser.skillsUsed], agents };
   }
@@ -669,15 +689,17 @@ export class Deck {
       args: live.args(id, opts, fresh),
       cwd,
       env: ADAPTERS[agent].env,
-      // fresh/resume isn't part of it: the process that created a session keeps serving it
-      sig: JSON.stringify([bin, cwd, opts]),
+      // fresh/resume isn't part of it: the process that created a session keeps serving it. Nor is the mode (see LiveSpec.mode), except bypassPermissions, which can only be set at launch.
+      sig: JSON.stringify([bin, cwd, { ...opts, mode: opts.mode === 'bypassPermissions' ? opts.mode : '' }]),
+      mode: opts.mode,
+      setMode: live.setMode,
       interrupt: live.interrupt(),
       isTurnEnd: live.isTurnEnd,
       controlReply: live.controlReply,
     };
   }
 
-  private newChat(draftKey: string, agent: AgentId, cwd: string, text: string, opts: RunOptions, attachments?: Attachment[]): void {
+  private newChat(draftKey: string, agent: AgentId, cwd: string, text: string, opts: RunOptions, attachments?: Attachment[], pinned?: ('model' | 'effort' | 'chrome')[]): void {
     const adapter = ADAPTERS[agent];
     const bin = this.binaryOrError(agent, draftKey);
     if (!bin) return;
@@ -685,9 +707,11 @@ export class Deck {
     const bind = (key: string, expectedFile?: string) => {
       this.state.open = [key, ...this.state.open.filter((k) => k !== key)];
       this.state.modes[key] = opts.mode;
-      this.state.models[key] = opts.model;
-      this.state.chrome[key] = opts.chrome;
-      this.state.efforts[key] = opts.effort;
+      // in low usage mode only what the user chose is kept: the rest should follow the mode when it ends
+      const keep = (k: 'model' | 'effort' | 'chrome') => !opts.low || !!pinned?.includes(k);
+      if (keep('model')) this.state.models[key] = opts.model;
+      if (keep('chrome')) this.state.chrome[key] = opts.chrome;
+      if (keep('effort')) this.state.efforts[key] = opts.effort;
       this.save();
       this.post({ type: 'bound', draftKey, key });
       this.post({ type: 'running', key, running: runner.isRunning(key) });
@@ -804,6 +828,11 @@ export class Deck {
     } finally {
       this.scanning = false;
     }
+  }
+
+  private panelSettings(): Record<string, unknown> {
+    const config = vscode.workspace.getConfiguration('vibeStudio');
+    return Object.fromEntries(Object.keys(PANEL_SETTINGS).map((k) => [k, config.get(k)]));
   }
 
   private reportInPoints(): boolean {

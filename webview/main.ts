@@ -10,6 +10,7 @@ import { excerpt, markSent, setComment, unsent, withComments, type PointComment 
 import { SUMMARY_PROMPT, continuationText, newestReply, offerHandoff } from './handoff';
 import { createLayouts } from './layouts';
 import { createShelf } from './shelf';
+import { createSettings } from './settings';
 import { pace, sayings, type Pace } from './commentary';
 import { SHORTCUTS, actionOf, neighbour } from './shortcuts';
 import { formatReset, timeLeft } from '../src/limits';
@@ -91,6 +92,8 @@ const ICONS: Record<string, string> = {
   comment: '<path d="M2.5 3.5h11v7H7.5l-3 2.5v-2.5h-2z"/>',
   wand: '<path d="M3 13l7-7M9.5 3.5l3 3M12 1.5v2M11 2.5h2M5 2.5v1.5M4.2 3.2h1.6M13 9v2M12 10h2"/>',
   shelf: '<path d="M2.5 9.5l2-5.5h7l2 5.5v3.5h-11zM2.5 9.5h3.2l.8 1.5h3l.8-1.5h3.2"/>',
+  info: '<circle cx="8" cy="8" r="5.5"/><path d="M8 7.4v3.3M8 5.3h.01"/>',
+  gear: '<path d="M12.73 6.73 L14.52 6.97 L14.52 9.03 L12.73 9.27 L12.24 10.45 L13.34 11.88 L11.88 13.34 L10.45 12.24 L9.27 12.73 L9.03 14.52 L6.97 14.52 L6.73 12.73 L5.55 12.24 L4.12 13.34 L2.66 11.88 L3.76 10.45 L3.27 9.27 L1.48 9.03 L1.48 6.97 L3.27 6.73 L3.76 5.55 L2.66 4.12 L4.12 2.66 L5.55 3.76 L6.73 3.27 L6.97 1.48 L9.03 1.48 L9.27 3.27 L10.45 3.76 L11.88 2.66 L13.34 4.12 L12.24 5.55Z"/><circle cx="8" cy="8" r="2"/>',
   grip: '<path d="M6 4h.01M10 4h.01M6 8h.01M10 8h.01M6 12h.01M10 12h.01" stroke-width="2"/>',
   layouts: '<rect x="2.5" y="2.5" width="5" height="5" rx="1"/><rect x="8.5" y="2.5" width="5" height="5" rx="1"/><rect x="2.5" y="8.5" width="11" height="5" rx="1"/>',
   server: '<rect x="2.5" y="3" width="11" height="4" rx="1.25"/><rect x="2.5" y="9" width="11" height="4" rx="1.25"/><path d="M5 5h.01M5 11h.01M8 5h3M8 11h3"/>',
@@ -200,6 +203,8 @@ interface Tile {
   commentsEl: HTMLElement;
   /** "Continue in a new chat", offered when the context is nearly full; `handoff` is set while the summary is being written. */
   continueBtn: HTMLButtonElement;
+  /** Context used (percent), for the Continue nudge. */
+  ctxPct?: number;
   handoff?: { before?: string };
   /** Drag handle in the header, and the cat's speech bubble with what it last said. */
   grip: HTMLElement;
@@ -342,6 +347,7 @@ const shelf = createShelf({
     if (tile) insertShelfItem(tile, item);
   },
 });
+const settingsUi = createSettings({ h: h as unknown as Parameters<typeof createSettings>[0]['h'], icon, post, agents: () => agents, lowUsage: () => lowUsage });
 const layoutsUi = createLayouts({ h: h as unknown as Parameters<typeof createLayouts>[0]['h'], icon, post, count: () => [...tiles.values()].filter((t) => !t.draft).length });
 const empty = h(
   'div',
@@ -381,6 +387,7 @@ const bar = h(
   colSeg,
   h('span', { class: 'bar-label', text: 'Rows' }),
   rowSeg,
+  settingsUi.button,
 );
 const recapBody = h('div', { class: 'recap-body' });
 const recapEl = h(
@@ -403,7 +410,7 @@ const recapEl = h(
   ),
 );
 const agentMap = createAgentMap({ h: h as unknown as AgentCtx['h'], icon, post, renderItem, modelLabel, tokens });
-const app = h('div', { class: 'app' }, side, h('main', { class: 'main' }, bar, grid, empty), recapEl, agentMap.el, shelf.drawer);
+const app = h('div', { class: 'app' }, side, h('main', { class: 'main' }, bar, grid, empty), recapEl, agentMap.el, shelf.drawer, settingsUi.panel);
 document.getElementById('app')!.replaceWith(app);
 
 /** Times and date dividers are always rendered; the setting only hides them, so it applies live. */
@@ -752,6 +759,47 @@ const providers = (): Provider[] => [
   ...(codexUsage ? [{ id: 'codex' as const, name: 'Codex', usage: codexUsage }] : []),
 ];
 
+let lowInfoOpen = false;
+
+/** Turns low usage mode on or off. Tiles you did not set up yourself follow the mode; the next message in each starts with the new flags. */
+function setLowUsage(on: boolean) {
+  lowUsage = on;
+  post({ type: 'setLowUsage', on });
+  refreshDefaults();
+  renderUsage();
+}
+
+/** Defaults changed (low usage mode, or the Settings panel): tiles that follow them pick up the new values for their next message. */
+function refreshDefaults() {
+  for (const t of tiles.values()) {
+    modeOptions(t);
+    modelOptions(t);
+    effortOptions(t);
+    t.chrome = picked(tileChrome, t.key, normalChrome(t.agent)) ?? defaultChrome(t.agent);
+    t.continueBtn.hidden = t.draft ? true : !offerHandoff(t.ctxPct, lowUsage);
+    syncTile(t);
+  }
+  settingsUi.refresh();
+}
+
+/** The switch at the top of the usage popup, and an info mark that lists what the mode does (on hover, or click). */
+function lowRow() {
+  const sonnet = lowModel('claude')?.label;
+  const lines = [
+    `${sonnet ?? 'Default model'} · high effort${sonnet ? '' : ' (no Sonnet found)'}`,
+    'Chrome off · no MCP servers (Claude)',
+    'Short answers; small tasks go to sub-agents',
+    'Continue nudge from 50% context',
+    'Tiles whose model, effort or Chrome you chose keep your choice',
+    'Applies from your next message in each chat',
+  ];
+  const wrap = h('span', { class: `info-wrap${lowInfoOpen ? ' open' : ''}` });
+  const info = h('button', { class: 'icon-btn info-btn', type: 'button', 'aria-label': 'What low usage mode does', 'aria-expanded': String(lowInfoOpen), onclick: () => ((lowInfoOpen = !lowInfoOpen), wrap.classList.toggle('open', lowInfoOpen), info.setAttribute('aria-expanded', String(lowInfoOpen))) }, icon('info'));
+  wrap.append(info, h('div', { class: 'info-pop', role: 'tooltip' }, ...lines.map((t) => h('div', { text: t }))));
+  const sw = h('button', { class: `switch${lowUsage ? ' on' : ''}`, type: 'button', role: 'switch', 'aria-checked': String(lowUsage), 'aria-label': 'Low usage mode', onclick: () => setLowUsage(!lowUsage) }, h('span', { class: 'switch-knob' }));
+  return h('div', { class: 'low-row' }, h('span', { class: 'low-title', text: 'Low usage mode' }), wrap, h('span', { class: 'spacer' }), sw);
+}
+
 /** "5h 8% · 3h 12m" per window, one orange group for Claude and one blue for Codex; the popup has every window, when it resets, and a refresh. */
 function renderUsage() {
   const m = accountUsage;
@@ -762,7 +810,7 @@ function renderUsage() {
   if (!list.length) {
     usageBtn.replaceChildren(h('span', { class: 'usage-label', text: 'Usage –' }));
     usageBtn.title = m?.state === 'unavailable' ? "Plan limits aren't available for this login method." : 'Failed to load usage data. Click to retry.';
-    usageBody.replaceChildren(h('div', { class: 'srv-empty', text: usageBtn.title }), h('button', { class: 'ask-btn', onclick: () => post({ type: 'refreshUsage' }) }, 'Try again'));
+    usageBody.replaceChildren(lowRow(), h('div', { class: 'srv-empty', text: usageBtn.title }), h('button', { class: 'ask-btn', onclick: () => post({ type: 'refreshUsage' }) }, 'Try again'));
     return;
   }
   const now = Date.now();
@@ -778,6 +826,7 @@ function renderUsage() {
   });
   usageBtn.replaceChildren(
     h('span', { class: 'usage-label', text: 'Usage' }),
+    lowUsage ? h('span', { class: 'usage-low', text: 'Low', title: 'Low usage mode is on' }) : '',
     // both fills start at the left; the higher one is drawn first, so the lower one sits on top and the rest shows beyond it
     h('span', { class: 'usage-bar dual' }, ...[...worst].sort((a, b) => b.w.pct - a.w.pct).map(({ p, w }, i) => h('span', { class: `usage-fill ${p.id}`, title: `${p.name} ${w.pct}%`, style: `width:${w.pct}%;z-index:${i + 1}` }))),
     ...worst.filter(({ w }) => w.pct >= 80).map(({ p, w }) =>
@@ -800,6 +849,7 @@ function renderUsage() {
     );
   const section = (title: string, ws: AccountUsage['windows']) => (ws.length ? h('div', { class: 'usage-sec' }, h('div', { class: 'usage-sec-title', text: title }), ...ws.map(item)) : '');
   usageBody.replaceChildren(
+    lowRow(),
     ...list.map((p) =>
       h(
         'div',
@@ -1016,9 +1066,21 @@ function modeOptions(tile: Tile) {
   tile.mode.replaceChildren(...(info?.modes ?? []).map((m) => h('option', { value: m.value, text: m.label, selected: m.value === value })));
 }
 
+// Low usage mode: what tiles use unless you picked something yourself (your picks are in tileModels / tileEfforts / tileChrome)
+let lowUsage = false;
+const lowModel = (agent: AgentId) => (agent === 'claude' ? agentInfo(agent)?.models.find((m) => /sonnet/i.test(m.label)) : undefined);
+/** A stored choice counts as yours only when it differs from the normal default: chats made here store their starting values too. */
+const picked = <T>(map: Record<string, T>, key: string, normal: T): T | undefined => (map[key] !== undefined && map[key] !== normal ? map[key] : undefined);
+const normalModel = (agent: AgentId) => agentInfo(agent)?.defaultModel ?? '';
+const normalEffort = (agent: AgentId) => agentInfo(agent)?.defaultEffort ?? '';
+const normalChrome = (agent: AgentId) => agentInfo(agent)?.defaultChrome ?? false;
+const defaultModel = (agent: AgentId) => (lowUsage ? lowModel(agent)?.value : undefined) ?? agentInfo(agent)?.defaultModel ?? '';
+const defaultEffort = (agent: AgentId) => (lowUsage ? 'high' : agentInfo(agent)?.defaultEffort ?? '');
+const defaultChrome = (agent: AgentId) => (lowUsage ? false : agentInfo(agent)?.defaultChrome ?? false);
+
 function modelOptions(tile: Tile) {
   const options = agentInfo(tile.agent)?.models ?? [{ value: '', label: 'Default model' }];
-  const value = tileModels[tile.key] ?? agentInfo(tile.agent)?.defaultModel ?? '';
+  const value = picked(tileModels, tile.key, normalModel(tile.agent)) ?? defaultModel(tile.agent);
   const list = options.some((m) => m.value === value) ? options : [...options, { value, label: value }];
   tile.model.replaceChildren(
     ...list.map((m) => h('option', { value: m.value, text: m.label, title: m.value || 'Use the CLI default', selected: m.value === value })),
@@ -1034,7 +1096,7 @@ function effortOptions(tile: Tile) {
   const info = agentInfo(tile.agent);
   const supported = info?.modelEfforts[tile.model.value];
   const levels = (info?.efforts ?? []).filter((l) => !supported || supported.includes(l.value));
-  const stored = tileEfforts[tile.key] ?? info?.defaultEffort ?? '';
+  const stored = picked(tileEfforts, tile.key, normalEffort(tile.agent)) ?? defaultEffort(tile.agent);
   const value = levels.some((l) => l.value === stored) ? stored : '';
   tile.effort.replaceChildren(
     h('option', { value: '', text: 'Default effort', title: 'Use the CLI default', selected: value === '' }),
@@ -1048,7 +1110,7 @@ function effortName(agent: AgentId, level: string) {
 
 function buildTile(key: string, agent: AgentId, draft?: { cwd: string }): Tile {
   const tile = {} as Tile;
-  const chrome = tileChrome[key] ?? agentInfo(agent)?.defaultChrome ?? false;
+  const chrome = picked(tileChrome, key, normalChrome(agent)) ?? defaultChrome(agent);
   Object.assign(tile, {
     key,
     agent,
@@ -1878,7 +1940,8 @@ function renderMeter(tile: Tile, u?: Usage) {
   if (pct !== undefined) fill.style.width = `${pct}%`;
   tile.meter.replaceChildren(pct !== undefined ? h('span', { class: 'meter-bar' }, fill) : '', h('span', { class: 'meter-text', text }));
   tile.meter.dataset.level = pct === undefined ? '' : pct >= 85 ? 'high' : pct >= 60 ? 'mid' : '';
-  tile.continueBtn.hidden = tile.draft ? true : !offerHandoff(pct);
+  tile.ctxPct = pct;
+  tile.continueBtn.hidden = tile.draft ? true : !offerHandoff(pct, lowUsage);
   tile.meter.title = [
     u.context != null
       ? `Context: ${u.context.toLocaleString()} tokens${u.window ? ` of ${u.window.toLocaleString()}` : ' (window size learned after the first reply sent from this studio)'}`
@@ -1922,7 +1985,7 @@ function renderHead(tile: Tile) {
       'aria-label': 'Agent',
       onchange: () => {
         tile.agent = agentSel.value as AgentId;
-        tile.chrome = tileChrome[tile.key] ?? agentInfo(tile.agent)?.defaultChrome ?? false;
+        tile.chrome = picked(tileChrome, tile.key, normalChrome(tile.agent)) ?? defaultChrome(tile.agent);
         closeSkillMenu(tile);
         const pet = createPet(tile.agent, wornCoats(tile), tile.key);
         tile.pet.el.replaceWith(pet.el);
@@ -2191,7 +2254,7 @@ function sendText(tile: Tile, text: string, attachments: Attachment[] = []) {
   const chrome = tile.chrome && !!agentInfo(tile.agent)?.supportsChrome;
   const files = attachments.length ? attachments : undefined;
   game.sent();
-  if (tile.draft) post({ type: 'newChat', draftKey: tile.key, agent: tile.agent, cwd: tile.draft.cwd, text, mode, model, effort, chrome, attachments: files });
+  if (tile.draft) post({ type: 'newChat', draftKey: tile.key, agent: tile.agent, cwd: tile.draft.cwd, text, mode, model, effort, chrome, attachments: files, pinned: ([['model', tileModels], ['effort', tileEfforts], ['chrome', tileChrome]] as const).filter(([, picks]) => picks[tile.key] !== undefined).map(([k]) => k) });
   else post({ type: 'send', key: tile.key, text, mode, model, effort, chrome, attachments: files });
   // the transcript will show attachments as [image] / [document]; match that so the pending bubble is replaced, not duplicated
   text = transcriptText(text, attachments);
@@ -2761,6 +2824,8 @@ window.addEventListener('message', (e: MessageEvent<ToWebview>) => {
       layoutsUi.set(m.layouts ?? []);
       shelf.set(m.shelf ?? []);
       commentaryOn = m.commentary ?? true;
+      lowUsage = m.lowUsage ?? false;
+      settingsUi.set(m.settings ?? {});
       cats = m.cats ?? {};
       servers.start();
       prompts = m.prompts ?? [];
@@ -2795,6 +2860,13 @@ window.addEventListener('message', (e: MessageEvent<ToWebview>) => {
     }
     case 'layouts':
       layoutsUi.set(m.list);
+      return;
+    case 'settings':
+      settingsUi.set(m.values);
+      return;
+    case 'agents':
+      agents = m.agents;
+      refreshDefaults();
       return;
     case 'commentary':
       commentaryOn = m.on;
@@ -2908,9 +2980,10 @@ window.addEventListener('message', (e: MessageEvent<ToWebview>) => {
         post({ type: 'setCat', key: m.key, cat: cats[m.key] });
       }
       tileModes[m.key] = tile.mode.value;
-      tileModels[m.key] = tile.model.value;
-      tileChrome[m.key] = tile.chrome;
-      tileEfforts[m.key] = tile.effort.value;
+      // a pick is what differs from the current defaults, so low usage mode can still hand the rest back
+      if (tileModels[m.draftKey] !== undefined || tile.model.value !== defaultModel(tile.agent)) tileModels[m.key] = tile.model.value;
+      if (tileChrome[m.draftKey] !== undefined || tile.chrome !== defaultChrome(tile.agent)) tileChrome[m.key] = tile.chrome;
+      if (tileEfforts[m.draftKey] !== undefined || tile.effort.value !== defaultEffort(tile.agent)) tileEfforts[m.key] = tile.effort.value;
       tiles.set(m.key, tile);
       if (maximized === m.draftKey) maximized = m.key;
       renderHead(tile);
@@ -3022,6 +3095,9 @@ document.addEventListener('keydown', (e) => {
       case 'shelf':
         shelf.toggle();
         break;
+      case 'settings':
+        settingsUi.toggle();
+        break;
     }
     return;
   }
@@ -3035,7 +3111,8 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key !== 'Escape') return;
-  if (shelf.isOpen() && !catCard) shelf.toggle(false);
+  if (settingsUi.isOpen()) settingsUi.toggle(false);
+  else if (shelf.isOpen() && !catCard) shelf.toggle(false);
   else if (catCard) closeCatCard();
   else if (!sheet.hidden) toggleSheet(false);
   else if (!recapEl.hidden) hideRecap();

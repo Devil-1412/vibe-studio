@@ -355,7 +355,13 @@ export type ToWebview =
       commentary: boolean;
       cats: Record<string, CatPrefs>;
       shelf: ShelfItem[];
+      lowUsage: boolean;
+      /** Current values of the settings the Settings panel shows. */
+      settings: Record<string, unknown>;
     }
+  | { type: 'settings'; values: Record<string, unknown> }
+  /** Agent defaults changed in settings. */
+  | { type: 'agents'; agents: AgentInfo[] }
   | { type: 'layouts'; list: SavedLayout[] }
   | { type: 'commentary'; on: boolean }
   | { type: 'servers'; projects: ProjectServers[] }
@@ -414,6 +420,8 @@ export type FromWebview =
       effort: string;
       chrome: boolean;
       attachments?: Attachment[];
+      /** Low usage mode only: which of these the user chose themselves, so the rest keep following the mode. */
+      pinned?: ('model' | 'effort' | 'chrome')[];
     }
   | { type: 'pickFolder'; draftKey: string }
   /** Files of the chat's folder for the @ picker; `cwd` is only read for a new-chat draft. */
@@ -422,6 +430,9 @@ export type FromWebview =
   | { type: 'refreshUsage' }
   | { type: 'gameSave'; state: GameState }
   | { type: 'servers' }
+  | { type: 'setSetting'; key: string; value: unknown }
+  | { type: 'openSettings' }
+  | { type: 'setLowUsage'; on: boolean }
   | { type: 'setCat'; key: string; cat: CatPrefs }
   | { type: 'shelfSave'; items: ShelfItem[] }
   | { type: 'improvePrompt'; key: string; text: string }

@@ -54,7 +54,7 @@ async function main() {
     agent: 'claude',
     items: parser.items,
     main: { title: 't', busy: false },
-    canStop: true,
+    canStop: false, // not our process: only the transcript can tell
     resolve: (it) => claudeAgentFile(session, it),
     now,
   });
@@ -75,7 +75,14 @@ async function main() {
   assert.equal(by['agent B'].background, true);
   assert.equal(by['agent C'].status, 'stopped', 'no transcript and asked long ago');
   assert.equal(by['agent A'].tools.map((t) => t.name).join(','), 'Read,Agent,Bash', 'tool calls include the nested spawn');
-  assert.equal(map.canStop, true);
+  assert.equal(map.canStop, false);
+
+  // our process is alive: it would have reported the agent ending, so a quiet transcript only means busy
+  const live = await buildAgentMap({ agent: 'claude', items: parser.items, main: { title: 't', busy: true }, canStop: true, resolve: (it) => claudeAgentFile(session, it), now });
+  const lv = Object.fromEntries(live.agents.map((a) => [a.description, a]));
+  assert.equal(lv['agent B'].status, 'working', 'quiet for minutes but the process is alive');
+  assert.equal(lv['agent C'].status, 'working');
+  assert.equal(lv['agent A'].status, 'finished', 'a finished agent stays finished');
 
   console.log('agents self-test: ok');
 }

@@ -6,21 +6,24 @@ import { Runner, type LiveSpec } from '../src/runner';
 
 const agent = path.join(__dirname, '..', 'scripts', 'fake-agent.mjs');
 const msg = (text: string | object[]) => JSON.stringify({ type: 'user', message: { role: 'user', content: text } });
-const spec = (sig: string): LiveSpec => ({
+const spec = (sig: string, mode?: string): LiveSpec => ({
   bin: process.execPath,
   args: [agent],
   sig,
+  mode,
+  setMode: (m) => JSON.stringify({ type: 'control_request', request_id: 'm', request: { subtype: 'set_permission_mode', mode: m } }),
   interrupt: JSON.stringify({ type: 'control_request', request_id: 'x', request: { subtype: 'interrupt' } }),
   isTurnEnd: (l) => JSON.parse(l).type === 'result',
 });
 
 /** Sends one message and resolves with the pid that answered and how the turn ended. */
-function turn(r: Runner, key: string, sig: string, text: string | object[], onStart?: () => void) {
-  return new Promise<{ pid: number; code: number | null; stopped: boolean }>((resolve) => {
+function turn(r: Runner, key: string, sig: string, text: string | object[], onStart?: () => void, mode?: string) {
+  return new Promise<{ pid: number; code: number | null; stopped: boolean; lines: string[] }>((resolve) => {
     let pid = 0;
-    r.send(key, spec(sig), msg(text), {
-      onLine: (l) => (pid = JSON.parse(l).pid ?? pid),
-      onExit: (code, _err, stopped) => resolve({ pid, code, stopped }),
+    const lines: string[] = [];
+    r.send(key, spec(sig, mode), msg(text), {
+      onLine: (l) => (lines.push(l), (pid = JSON.parse(l).pid ?? pid)),
+      onExit: (code, _err, stopped) => resolve({ pid, code, stopped, lines }),
     });
     onStart?.();
   });
@@ -49,6 +52,18 @@ async function main() {
 
   const d = await turn(r, 'k', 'v2', 'new flags');
   assert.notEqual(d.pid, a.pid, 'changed flags start a new process');
+
+  // a permission-mode change is sent to the running process: no restart, so its sub-agents live on
+  const m1 = await turn(r, 'km', 'v1', 'first', undefined, 'auto');
+  const m2 = await turn(r, 'km', 'v1', 'same mode', undefined, 'auto');
+  assert.equal(m2.pid, m1.pid);
+  assert.ok(!m2.lines.some((l) => l.includes('mode:')), 'the same mode sends nothing');
+  const m3 = await turn(r, 'km', 'v1', 'new mode', undefined, 'plan');
+  assert.equal(m3.pid, m1.pid, 'a new mode keeps the process');
+  assert.ok(m3.lines.some((l) => JSON.parse(l).text === 'mode:plan'), 'and tells it the new mode');
+  const m4 = await turn(r, 'km', 'v1', 'back', undefined, 'auto');
+  assert.ok(m4.pid === m1.pid && m4.lines.some((l) => JSON.parse(l).text === 'mode:auto'), 'switching back works too');
+  r.release('km');
 
   const other = await turn(r, 'k2', 'v2', 'other tile');
   assert.notEqual(other.pid, d.pid, 'each session has its own process');

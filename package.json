@@ -2,7 +2,7 @@
   "name": "vibe-studio",
   "displayName": "Vibe Studio",
   "description": "Vibe code with several AI agents at once: your Claude Code and Codex chats side by side, each with its own message box, plus cats, a shelf and a magic wand.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "VibeCoder1412",
   "license": "MIT",
   "private": true,
@@ -90,6 +90,16 @@
             "danger-full-access"
           ],
           "description": "Default sandbox for messages sent to Codex sessions."
+        },
+        "vibeStudio.codexModel": {
+          "type": "string",
+          "default": "",
+          "description": "Default model for Codex tiles that have not picked their own. Empty = the Codex CLI default."
+        },
+        "vibeStudio.codexEffort": {
+          "type": "string",
+          "default": "",
+          "description": "Default reasoning effort for Codex tiles that have not picked their own. Empty = the Codex CLI default."
         },
         "vibeStudio.claudeModels": {
           "type": "array",
@@ -199,10 +209,12 @@
     "test:comments": "esbuild scripts/comments-selftest.ts --bundle --platform=node --outfile=dist/comments-selftest.js --log-level=warning && node dist/comments-selftest.js",
     "test:improve": "esbuild scripts/improve-selftest.ts --bundle --platform=node --outfile=dist/improve-selftest.js --log-level=warning && node dist/improve-selftest.js",
     "test:shelf": "esbuild scripts/shelf-selftest.ts --bundle --platform=node --outfile=dist/shelf-selftest.js --log-level=warning && node dist/shelf-selftest.js",
+    "test:low": "esbuild scripts/low-selftest.ts --bundle --platform=node --outfile=dist/low-selftest.js --log-level=warning && node dist/low-selftest.js",
     "test:game": "esbuild scripts/game-selftest.ts --bundle --platform=node --outfile=dist/game-selftest.js --log-level=warning && node dist/game-selftest.js",
     "test:asks": "esbuild scripts/asks-selftest.ts --bundle --platform=node --outfile=dist/asks-selftest.js --log-level=warning && node dist/asks-selftest.js",
     "test:parser": "esbuild scripts/parser-selftest.ts --bundle --platform=node --outfile=dist/parser-selftest.js --log-level=warning && node dist/parser-selftest.js",
-    "test:agents": "esbuild scripts/agents-selftest.ts --bundle --platform=node --outfile=dist/agents-selftest.js --log-level=warning && node dist/agents-selftest.js"
+    "test:agents": "esbuild scripts/agents-selftest.ts --bundle --platform=node --outfile=dist/agents-selftest.js --log-level=warning && node dist/agents-selftest.js",
+    "test:settings": "esbuild scripts/settings-selftest.ts --bundle --platform=node --outfile=dist/settings-selftest.js --log-level=warning && node dist/settings-selftest.js"
   },
   "devDependencies": {
     "@types/node": "^20.17.0",

@@ -17,10 +17,11 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: 'Ctrl+Alt+S', what: 'Show or hide the session list' },
   { keys: 'Ctrl+Alt+U', what: 'Usage limits' },
   { keys: 'Ctrl+Alt+H', what: 'Shelf' },
+  { keys: 'Ctrl+Alt+,', what: 'Settings' },
   { keys: 'Ctrl+Alt+/', what: 'This list' },
 ];
 
-export type Action = 'max' | 'zen' | 'tile' | 'left' | 'right' | 'up' | 'down' | 'new' | 'close' | 'sidebar' | 'usage' | 'shelf' | 'help';
+export type Action = 'max' | 'zen' | 'tile' | 'left' | 'right' | 'up' | 'down' | 'new' | 'close' | 'sidebar' | 'usage' | 'shelf' | 'settings' | 'help';
 
 /** What a key press means, or undefined. Needs Ctrl+Alt, never AltGr (that types characters on many layouts). */
 export function actionOf(e: { ctrlKey: boolean; altKey: boolean; metaKey: boolean; shiftKey: boolean; code: string; key: string }, altGraph = false): { action: Action; shift: boolean; n?: number } | undefined {
@@ -50,6 +51,8 @@ export function actionOf(e: { ctrlKey: boolean; altKey: boolean; metaKey: boolea
       return { action: 'sidebar', shift };
     case 'KeyU':
       return { action: 'usage', shift };
+    case 'Comma':
+      return { action: 'settings', shift };
     case 'KeyH':
       return { action: 'shelf', shift };
     case 'Slash':

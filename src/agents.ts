@@ -77,11 +77,12 @@ export function codexAgentFile(fileFor: (key: string) => string | undefined, ite
   }
 }
 
-export function agentStatus(item: AgentItem, f: AgentFile | undefined, now = Date.now()): AgentStatus {
+/** `alive`: Vibe Studio runs this chat's process, which would have reported the agent ending, so a quiet transcript only means it is busy. */
+export function agentStatus(item: AgentItem, f: AgentFile | undefined, now = Date.now(), alive = false): AgentStatus {
   if (item.status === 'done') return 'finished';
   if (item.status !== 'running') return item.status;
   if (f?.finished) return 'finished';
-  return now - (f?.mtime ?? item.startedAt ?? 0) < QUIET_MS ? 'working' : 'stopped';
+  return alive || now - (f?.mtime ?? item.startedAt ?? 0) < QUIET_MS ? 'working' : 'stopped';
 }
 
 interface Loaded {
@@ -147,7 +148,7 @@ export async function buildAgentMap(inp: MapInput): Promise<AgentMap> {
       seen.add(it.id);
       const f = inp.resolve(it);
       const sub = f ? await load(inp.agent, f) : undefined;
-      const status = agentStatus(it, f, now);
+      const status = agentStatus(it, f, now, inp.canStop);
       const startedAt = it.startedAt ?? (sub?.firstTs || undefined);
       const endedAt = it.endedAt ?? (status !== 'working' && sub?.lastTs ? sub.lastTs : undefined);
       const tools = sub?.tools ?? [];

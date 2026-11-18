@@ -13,6 +13,7 @@ assert.deepEqual(actionOf(key('ArrowLeft', { shiftKey: true })), { action: 'left
 assert.equal(actionOf(key('KeyN'))?.action, 'new');
 assert.equal(actionOf(key('KeyS'))?.action, 'sidebar');
 assert.equal(actionOf(key('KeyH'))?.action, 'shelf');
+assert.equal(actionOf(key('Comma'))?.action, 'settings');
 assert.equal(actionOf(key('KeyB')), undefined, 'Ctrl+Alt+B belongs to VS Code');
 assert.equal(actionOf(key('KeyN', { shiftKey: true })), undefined);
 assert.equal(actionOf(key('Slash'))?.action, 'help');

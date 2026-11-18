@@ -3,6 +3,8 @@
 
 /** Context use (percent) from which the button is offered. */
 export const HANDOFF_AT = 80;
+/** The same, in low usage mode: a long context is what makes every turn expensive. */
+export const HANDOFF_AT_LOW = 50;
 
 export const SUMMARY_PROMPT =
   'Summarize this chat so I can continue it in a fresh one: the goal, what is done, what is left, the files and decisions that matter, and any commands to run. Under 300 words, plain text, no preamble.';
@@ -22,4 +24,4 @@ export function newestReply(items: { id: string; kind: string; text?: string }[]
   return undefined;
 }
 
-export const offerHandoff = (pct: number | undefined): boolean => pct !== undefined && pct >= HANDOFF_AT;
+export const offerHandoff = (pct: number | undefined, low = false): boolean => pct !== undefined && pct >= (low ? HANDOFF_AT_LOW : HANDOFF_AT);

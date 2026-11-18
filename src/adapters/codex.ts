@@ -3,7 +3,7 @@ import * as path from 'path';
 import {
   AgentAdapter,
   HOME,
-  POINTS_PROMPT,
+  extraInstructions,
   RunPlan,
   SessionMeta,
   TranscriptParser,
@@ -400,7 +400,7 @@ export const codex: AgentAdapter = {
   },
 
   supportsChrome: false,
-  resumePlan: (id, text, { mode, model, effort, points }): RunPlan => ({
+  resumePlan: (id, text, { mode, model, effort, points, low }): RunPlan => ({
     args: [
       'exec',
       'resume',
@@ -412,13 +412,13 @@ export const codex: AgentAdapter = {
       'approval_policy="never"',
       ...(model ? ['-m', model] : []),
       ...effortArgs(effort),
-      ...(points ? ['-c', `developer_instructions=${JSON.stringify(POINTS_PROMPT)}`] : []),
+      ...(points || low ? ['-c', `developer_instructions=${JSON.stringify(extraInstructions({ points, low }))}`] : []),
       id,
       '-',
     ],
     stdin: text,
   }),
-  newPlan: (text, _newId, { mode, model, effort, points }): RunPlan => ({
+  newPlan: (text, _newId, { mode, model, effort, points, low }): RunPlan => ({
     args: [
       'exec',
       '--json',
@@ -429,7 +429,7 @@ export const codex: AgentAdapter = {
       'approval_policy="never"',
       ...(model ? ['-m', model] : []),
       ...effortArgs(effort),
-      ...(points ? ['-c', `developer_instructions=${JSON.stringify(POINTS_PROMPT)}`] : []),
+      ...(points || low ? ['-c', `developer_instructions=${JSON.stringify(extraInstructions({ points, low }))}`] : []),
       '-',
     ],
     stdin: text,

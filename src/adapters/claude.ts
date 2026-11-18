@@ -3,7 +3,7 @@ import * as path from 'path';
 import {
   AgentAdapter,
   HOME,
-  POINTS_PROMPT,
+  extraInstructions,
   RunOptions,
   RunPlan,
   SessionMeta,
@@ -526,7 +526,8 @@ function attachmentBlock(a: Attachment) {
   return { type: 'document', source: { type: 'text', media_type: 'text/plain', data: a.data }, title: a.name };
 }
 
-function args({ mode, model, effort, chrome, points }: RunOptions): string[] {
+function args({ mode, model, effort, chrome, points, low }: RunOptions): string[] {
+  const extra = extraInstructions({ points, low });
   return [
     '--output-format',
     'stream-json',
@@ -536,7 +537,9 @@ function args({ mode, model, effort, chrome, points }: RunOptions): string[] {
     ...(model ? ['--model', model] : []),
     ...(effort && isEffort(effort) ? ['--effort', effort] : []),
     ...(chrome ? ['--chrome'] : []),
-    ...(points ? ['--append-system-prompt', POINTS_PROMPT] : []),
+    ...(extra ? ['--append-system-prompt', extra] : []),
+    // no MCP servers: their tool lists are sent with every turn
+    ...(low ? ['--strict-mcp-config'] : []),
   ];
 }
 
@@ -583,6 +586,8 @@ export const claude: AgentAdapter = {
         message: { role: 'user', content: attachments?.length ? [...(text ? [{ type: 'text', text }] : []), ...attachments.map(attachmentBlock)] : text },
       }),
     interrupt: () => JSON.stringify({ type: 'control_request', request_id: randomUUID(), request: { subtype: 'interrupt' } }),
+    // the CLI takes acceptEdits, auto, plan and default this way; bypassPermissions needs a restart
+    setMode: (mode) => JSON.stringify({ type: 'control_request', request_id: randomUUID(), request: { subtype: 'set_permission_mode', mode: mode === 'manual' ? 'default' : mode } }),
     // same request the Claude Code panel sends for its "Stop agent" button
     stopTask: (taskId) => JSON.stringify({ type: 'control_request', request_id: randomUUID(), request: { subtype: 'stop_task', task_id: taskId } }),
     isTurnEnd: (line) => line.includes('"type":"result"') && safeJson(line)?.type === 'result',

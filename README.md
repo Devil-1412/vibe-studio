@@ -145,6 +145,14 @@ Ctrl+Alt on every platform (press **Ctrl+Alt+/** in Vibe Studio for this list):
 | Ctrl+Alt+F | Focus view |
 | Ctrl+Alt+S / U | Session list / usage limits |
 
+### Settings
+
+The gear at the right end of the top bar (or Ctrl+Alt+,) opens Settings: the default model, effort, permission mode and Chrome for Claude; model, effort and sandbox for Codex; and switches for report in points, timestamps, Focus view, cat commentary, the coin game and the status bar button. Changes save at once as your VS Code user settings (`vibeStudio.*`), so the two always agree. New chats, and tiles where you have not picked your own, use the new defaults from their next message. Prompt chips, extra model names and CLI paths are edited in VS Code's settings (the panel links there).
+
+### Low usage mode
+
+A switch at the top of the usage popup (manual only), with an info mark that lists what it does. While it is on, tiles that follow the defaults use Sonnet at high effort with Chrome off, Claude chats start with no MCP servers, every turn gets a short instruction (be brief, no recaps, send small self-contained tasks to sub-agents), and the **Continue ↗** nudge appears from 50% context instead of 80%. A tile whose model, effort or Chrome setting you chose yourself keeps your choice, and Codex tiles keep their model. It applies from your next message in each chat; because the flags change, that restarts the chat's process, which ends any background sub-agents it still has running. Turning it off puts the defaults back.
+
 ### Usage
 
 The usage meter shows Claude in orange and Codex in blue. Claude's numbers come from the CLI. Codex has no way to be asked, so its numbers are read from the newest Codex session on disk and show "as of the last Codex run"; a window that has since reset shows 0%.

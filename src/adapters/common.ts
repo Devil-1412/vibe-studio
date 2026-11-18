@@ -143,6 +143,13 @@ export abstract class TranscriptParser {
 export const POINTS_PROMPT =
   'When you report findings, results or a summary to the user, write them as short bullet points, one idea per point, with no long paragraphs. Use a numbered list for steps in order. Keep code and commands in code blocks.';
 
+/** Low usage mode: fewer tokens per turn, without taking away what the agent can do. */
+export const LOW_PROMPT =
+  'Be brief: no recaps, no restating the question, and do not repeat file contents or long output you already showed. Prefer targeted reads and searches over reading whole files. Hand small self-contained tasks (searching, reading many files, running tests) to sub-agents so this conversation stays small.';
+
+/** What Vibe Studio adds to the agent's instructions for this run, or ''. */
+export const extraInstructions = (o: { points?: boolean; low?: boolean }): string => [o.points && POINTS_PROMPT, o.low && LOW_PROMPT].filter(Boolean).join(' ');
+
 export interface RunOptions {
   mode: string;
   /** '' = let the CLI use its default. */
@@ -152,6 +159,8 @@ export interface RunOptions {
   chrome: boolean;
   /** Ask for reports in bullet points (vibeStudio.reportInPoints). */
   points?: boolean;
+  /** Low usage mode is on: the model and effort were chosen by the webview, this adds no MCP servers and the short-answers instruction. */
+  low?: boolean;
 }
 
 export interface EffortInfo {
@@ -200,6 +209,8 @@ export interface AgentAdapter {
     args(id: string, opts: RunOptions, fresh: boolean): string[];
     message(text: string, attachments?: Attachment[]): string;
     interrupt(): string;
+    /** Changes the permission mode of the running process, so its sub-agents keep going. */
+    setMode(mode: string): string;
     /** Stops one sub-agent (or background task) without ending the turn. */
     stopTask(taskId: string): string;
     isTurnEnd(line: string): boolean;

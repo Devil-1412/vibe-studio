@@ -4268,6 +4268,167 @@ li.has-pt:hover > .pt-btn,
   background: var(--surface);
 }
 
+/* low usage mode: the switch in the usage popup, its info mark, and the tag on the usage pill */
+.low-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--code-bg);
+  cursor: pointer;
+}
+
+.switch.on {
+  border-color: transparent;
+  background: var(--ok);
+}
+
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--fg);
+  transition: transform 0.15s;
+}
+
+.switch.on .switch-knob {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch-knob {
+    transition: none;
+  }
+}
+
+.info-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.info-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.info-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: -8px;
+  z-index: 5;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  width: 270px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  font-size: 0.88em;
+  font-weight: 400;
+}
+
+.info-wrap:hover .info-pop,
+.info-wrap:focus-within .info-pop,
+.info-wrap.open .info-pop {
+  display: flex;
+}
+
+.usage-low {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ok) 22%, transparent);
+  color: var(--ok);
+  font-size: 0.82em;
+  font-weight: 600;
+}
+
+/* settings panel */
+.set-card {
+  width: min(560px, 94vw);
+  gap: 12px;
+  overflow: hidden; /* the header stays; only the body scrolls */
+}
+
+.set-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  /* room for the scroll bar, so it never sits on the switches and selects */
+  padding-right: 12px;
+  scrollbar-gutter: stable;
+}
+
+.set-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 26px;
+}
+
+.set-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.set-hint,
+.set-note {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+
+.set-note.warn {
+  color: var(--warn);
+}
+
+.set-select {
+  box-sizing: border-box;
+  width: 220px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--input-fg);
+}
+
+.set-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
 /* a chat waiting on you shows its card, not the cat */
 .tile.needs-you .pet,
 .tile.needs-you .pet-bubble {

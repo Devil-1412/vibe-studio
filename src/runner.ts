@@ -16,6 +16,9 @@ export interface LiveSpec {
   env?: Record<string, string>;
   /** Same signature = same flags, so the running process can take the next message. */
   sig: string;
+  /** Permission mode the next message wants. A different one is sent to the running process instead of restarting it. */
+  mode?: string;
+  setMode?(mode: string): string;
   /** Line that interrupts the current turn without ending the process. */
   interrupt?: string;
   isTurnEnd(line: string): boolean;
@@ -103,7 +106,12 @@ export class Runner {
       this.close(key);
       l = undefined;
     }
-    l ??= this.spawnLive(key, spec);
+    if (!l) l = this.spawnLive(key, spec);
+    else if (spec.mode && spec.mode !== l.spec.mode && spec.setMode) {
+      // a restart would kill the sub-agents still running in this process
+      l.proc.stdin?.write(`${spec.setMode(spec.mode)}\n`);
+      l.spec = { ...l.spec, mode: spec.mode };
+    }
     clearTimeout(l.idle);
     Object.assign(l, { busy: true, handlers: h, err: '', stopping: false, release: false });
     l.proc.stdin?.write(`${line}\n`);
