@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import { safeJson, type RunOptions, type TranscriptParser } from './adapters/common';
 import { resolveBinary } from './binaries';
 import { findFiles, readAttachments, rgFrom } from './files';
-import { agentStatus, buildAgentMap, claudeAgentFile, codexAgentFile, type AgentFile } from './agents';
+import { agentStatus, buildAgentMap, type LiveProcess, claudeAgentFile, codexAgentFile, type AgentFile } from './agents';
 import { cleanCat, loadGame, type GameState } from './game';
 import { scanServers } from './servers';
 import { latestCodexUsage } from './codexUsage';
@@ -285,6 +285,7 @@ export class Deck {
             busy: runner.isRunning(m.key) || s?.status === 'active',
           },
           canStop: runner.hasLive(m.key),
+          live: this.liveProcess(m.key),
           resolve: this.resolveAgent(m.key),
         });
         this.post({ type: 'agentMap', key: m.key, map });
@@ -532,7 +533,7 @@ export class Deck {
     const resolve = this.resolveAgent(tile.key);
     // only a running agent needs its transcript looked at to tell working from stopped
     const agents = tile.parser.items.flatMap((i) =>
-      i.kind === 'agent' ? [{ id: i.id, description: i.description, status: agentStatus(i, i.status === 'running' ? resolve(i) : undefined, Date.now(), runner.hasLive(tile.key)) }] : [],
+      i.kind === 'agent' ? [{ id: i.id, description: i.description, status: agentStatus(i, i.status === 'running' ? resolve(i) : undefined, Date.now(), this.liveProcess(tile.key)) }] : [],
     );
     return { model, effort, usage: { ...usage, window }, files: [...tile.parser.files.values()], skills: [...tile.parser.skillsUsed], agents };
   }
@@ -693,6 +694,7 @@ export class Deck {
       sig: JSON.stringify([bin, cwd, { ...opts, mode: opts.mode === 'bypassPermissions' ? opts.mode : '' }]),
       mode: opts.mode,
       setMode: live.setMode,
+      keepAlive: () => Deck.current?.backgroundRunning(`${agent}:${id}`) ?? false,
       interrupt: live.interrupt(),
       isTurnEnd: live.isTurnEnd,
       controlReply: live.controlReply,
@@ -828,6 +830,18 @@ export class Deck {
     } finally {
       this.scanning = false;
     }
+  }
+
+  private liveProcess(key: string): LiveProcess | undefined {
+    const since = runner.liveSince(key);
+    return since === undefined ? undefined : { since, busy: runner.isRunning(key) };
+  }
+
+  /** A background agent the current process started has not reported ending. */
+  backgroundRunning(key: string): boolean {
+    const since = runner.liveSince(key);
+    const items = this.tiles.get(key)?.parser.items ?? [];
+    return since !== undefined && items.some((i) => i.kind === 'agent' && i.background && i.status === 'running' && (i.startedAt ?? 0) >= since);
   }
 
   private panelSettings(): Record<string, unknown> {

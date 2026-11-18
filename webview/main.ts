@@ -3014,6 +3014,8 @@ document.addEventListener('click', (e) => {
   const href = a?.getAttribute('href');
   if (!a || !href) return;
   e.preventDefault();
+  // VS Code's webview script opens any clicked link from a window listener that ignores preventDefault: stop it there, or links open twice
+  e.stopPropagation();
   const key = a.closest<HTMLElement>('.tile')?.dataset.key;
   post({ type: 'openLink', href, key });
 });

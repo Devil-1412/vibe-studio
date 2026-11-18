@@ -24,6 +24,8 @@ export interface LiveSpec {
   isTurnEnd(line: string): boolean;
   /** Answer to a control request the process sends us, so it never waits on the host. */
   controlReply?(line: string): string | undefined;
+  /** Checked before an idle process is closed: true keeps it (background agents still working would die with it). */
+  keepAlive?(): boolean;
 }
 
 interface Live {
@@ -35,6 +37,8 @@ interface Live {
   stopping: boolean;
   release: boolean;
   idle?: NodeJS.Timeout;
+  /** When the process started (ms). */
+  since: number;
 }
 
 // Idle live processes exit after this; the next message starts a new one (and runs SessionStart hooks again).
@@ -58,6 +62,9 @@ function readLines(child: ChildProcess, onLine: (line: string) => void): () => v
 
 /** One agent process per session, so each tile talks to its own agent. */
 export class Runner {
+  /** How long a live process may sit idle before it is closed (tests use a short one). */
+  constructor(private readonly idleMs = LIVE_IDLE_MS) {}
+
   private procs = new Map<string, ChildProcess>();
   private stopped = new Set<ChildProcess>();
   private live = new Map<string, Live>();
@@ -119,7 +126,7 @@ export class Runner {
 
   private spawnLive(key: string, spec: LiveSpec): Live {
     const proc = spawn(spec.bin, spec.args, { cwd: workDir(spec.cwd), env: { ...process.env, ...spec.env }, stdio: ['pipe', 'pipe', 'pipe'] });
-    const l: Live = { proc, spec, busy: false, err: '', stopping: false, release: false };
+    const l: Live = { proc, spec, busy: false, err: '', stopping: false, release: false, since: Date.now() };
     this.live.set(key, l);
     readLines(proc, (line) => {
       const reply = spec.controlReply?.(line);
@@ -154,9 +161,22 @@ export class Runner {
     l.handlers = undefined;
     if (this.live.get(key) === l) {
       if (l.release) this.close(key);
-      else l.idle = setTimeout(() => this.close(key), LIVE_IDLE_MS);
+      else this.armIdle(key, l);
     }
     h?.onExit(code, l.err.trim(), l.stopping);
+  }
+
+  private armIdle(key: string, l: Live): void {
+    l.idle = setTimeout(() => {
+      if (this.live.get(key) !== l || l.busy) return;
+      if (l.spec.keepAlive?.()) this.armIdle(key, l);
+      else this.close(key);
+    }, this.idleMs);
+  }
+
+  /** When the live process for this session started, or undefined if there is none. */
+  liveSince(key: string): number | undefined {
+    return this.live.get(key)?.since;
   }
 
   /** Ends a live process (closing stdin lets it exit cleanly). */

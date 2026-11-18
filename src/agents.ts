@@ -77,12 +77,23 @@ export function codexAgentFile(fileFor: (key: string) => string | undefined, ite
   }
 }
 
-/** `alive`: Vibe Studio runs this chat's process, which would have reported the agent ending, so a quiet transcript only means it is busy. */
-export function agentStatus(item: AgentItem, f: AgentFile | undefined, now = Date.now(), alive = false): AgentStatus {
+/** The chat's process that Vibe Studio runs: when it started, and whether a turn is in progress. */
+export interface LiveProcess {
+  since: number;
+  busy: boolean;
+}
+
+/**
+ * With `live`, the process is ours and reports every agent it ends. An agent it started is working while it is a background
+ * agent or its turn is still going; one started before it (an earlier process, now gone) can no longer be running.
+ * Without it, a transcript that went quiet is the only sign.
+ */
+export function agentStatus(item: AgentItem, f: AgentFile | undefined, now = Date.now(), live?: LiveProcess): AgentStatus {
   if (item.status === 'done') return 'finished';
   if (item.status !== 'running') return item.status;
   if (f?.finished) return 'finished';
-  return alive || now - (f?.mtime ?? item.startedAt ?? 0) < QUIET_MS ? 'working' : 'stopped';
+  if (live && item.startedAt !== undefined) return item.startedAt >= live.since && (item.background || live.busy) ? 'working' : 'stopped';
+  return now - (f?.mtime ?? item.startedAt ?? 0) < QUIET_MS ? 'working' : 'stopped';
 }
 
 interface Loaded {
@@ -133,6 +144,8 @@ export interface MapInput {
   items: ChatItem[];
   main: AgentMap['main'];
   canStop: boolean;
+  /** The chat's process, when Vibe Studio runs it. */
+  live?: LiveProcess;
   resolve(item: AgentItem): AgentFile | undefined;
   now?: number;
 }
@@ -148,7 +161,7 @@ export async function buildAgentMap(inp: MapInput): Promise<AgentMap> {
       seen.add(it.id);
       const f = inp.resolve(it);
       const sub = f ? await load(inp.agent, f) : undefined;
-      const status = agentStatus(it, f, now, inp.canStop);
+      const status = agentStatus(it, f, now, inp.live);
       const startedAt = it.startedAt ?? (sub?.firstTs || undefined);
       const endedAt = it.endedAt ?? (status !== 'working' && sub?.lastTs ? sub.lastTs : undefined);
       const tools = sub?.tools ?? [];

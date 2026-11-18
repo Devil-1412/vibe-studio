@@ -77,12 +77,22 @@ async function main() {
   assert.equal(by['agent A'].tools.map((t) => t.name).join(','), 'Read,Agent,Bash', 'tool calls include the nested spawn');
   assert.equal(map.canStop, false);
 
-  // our process is alive: it would have reported the agent ending, so a quiet transcript only means busy
-  const live = await buildAgentMap({ agent: 'claude', items: parser.items, main: { title: 't', busy: true }, canStop: true, resolve: (it) => claudeAgentFile(session, it), now });
-  const lv = Object.fromEntries(live.agents.map((a) => [a.description, a]));
-  assert.equal(lv['agent B'].status, 'working', 'quiet for minutes but the process is alive');
-  assert.equal(lv['agent C'].status, 'working');
-  assert.equal(lv['agent A'].status, 'finished', 'a finished agent stays finished');
+  // our process: it reports every agent it ends, so the transcript going quiet means nothing
+  const mapWith = async (since: number, busy: boolean) => {
+    const m = await buildAgentMap({ agent: 'claude', items: parser.items, main: { title: 't', busy }, canStop: true, live: { since, busy }, resolve: (it) => claudeAgentFile(session, it), now });
+    return Object.fromEntries(m.agents.map((a) => [a.description, a.status]));
+  };
+  const beforeSpawns = Date.UTC(2026, 10, 11, 9, 59, 0); // this process started the agents
+  const afterSpawns = Date.UTC(2026, 10, 11, 11, 0, 0); // started after them: they belonged to an earlier process
+  let st = await mapWith(beforeSpawns, false);
+  assert.equal(st['agent B'], 'working', 'a background agent of this process works on after the turn, however quiet');
+  assert.equal(st['agent C'], 'stopped', 'a foreground agent cannot outlive its turn');
+  assert.equal(st['agent A'], 'finished', 'a finished agent stays finished');
+  st = await mapWith(beforeSpawns, true);
+  assert.equal(st['agent C'], 'working', 'while the turn runs, its foreground agent works');
+  st = await mapWith(afterSpawns, true);
+  assert.equal(st['agent B'], 'stopped', 'an agent from an earlier process died with it, even if the transcript says running');
+  assert.equal(st['agent C'], 'stopped');
 
   console.log('agents self-test: ok');
 }

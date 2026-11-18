@@ -71,8 +71,25 @@ async function main() {
   r.release('k');
   await new Promise((res) => setTimeout(res, 300));
   assert.throws(() => process.kill(d.pid, 0), 'released process exits');
-
   r.dispose();
+
+  // idle shutdown waits while background agents still work, then closes
+  const short = new Runner(150);
+  let busyAgents = true;
+  const keepSpec = { ...spec('v1'), keepAlive: () => busyAgents };
+  const kept = await new Promise<number>((resolve) => {
+    let pid = 0;
+    short.send('kk', keepSpec, msg('hi'), { onLine: (l) => (pid = JSON.parse(l).pid ?? pid), onExit: () => resolve(pid) });
+  });
+  await new Promise((res) => setTimeout(res, 500));
+  assert.doesNotThrow(() => process.kill(kept, 0), 'idle, but a background agent is working: the process stays');
+  assert.equal(short.liveSince('kk')! <= Date.now(), true, 'its start time is known');
+  busyAgents = false;
+  await new Promise((res) => setTimeout(res, 3600));
+  assert.throws(() => process.kill(kept, 0), 'once they are done it closes');
+  assert.equal(short.liveSince('kk'), undefined);
+  short.dispose();
+
   console.log('runner self-test: ok');
 }
 
